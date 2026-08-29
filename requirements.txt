@@ -3,3 +3,4 @@ anthropic>=0.40
 pillow>=10.0
 pyyaml>=6.0
 opencv-python-headless>=4.9
+pillow-heif>=0.16
