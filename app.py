@@ -25,13 +25,22 @@ from pathlib import Path
 
 import streamlit as st
 import yaml
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
 try:
     import cv2
     CV2_AVAILABLE = True
 except ImportError:
     CV2_AVAILABLE = False
+
+# Optional: lets the app open HEIC/HEIF files, which phones and WhatsApp
+# frequently produce while still naming them .jpg or .jpeg.
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    HEIF_AVAILABLE = True
+except ImportError:
+    HEIF_AVAILABLE = False
 
 try:
     import anthropic
@@ -244,6 +253,88 @@ Respond with ONLY a JSON object. No markdown fences, no preamble, no commentary.
 # ---------------------------------------------------------------------------
 # Image helpers
 # ---------------------------------------------------------------------------
+
+def sniff_format(head: bytes) -> str:
+    """Identify the real container from magic bytes, ignoring the filename."""
+    if head[:3] == b"\xff\xd8\xff":
+        return "JPEG"
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "PNG"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "WEBP"
+    if head[4:8] == b"ftyp":
+        brand = head[8:12]
+        if brand in (b"heic", b"heix", b"hevc", b"heim", b"heis", b"mif1",
+                     b"msf1", b"avif", b"avis"):
+            return "HEIC/AVIF"
+        return "MP4/MOV video"
+    if head[:4] in (b"GIF8",):
+        return "GIF"
+    if head[:2] == b"BM":
+        return "BMP"
+    if head[:4] in (b"II*\x00", b"MM\x00*"):
+        return "TIFF"
+    return "unknown"
+
+
+def load_uploaded_image(uploaded) -> Image.Image:
+    """
+    Open an uploaded file as an RGB image.
+
+    Streamlit's UploadedFile is a buffer whose position may already have moved,
+    and phone photos routinely carry a misleading extension. Read the bytes
+    once, check what the file actually is, and raise something an operator can
+    act on rather than PIL's bare UnidentifiedImageError.
+    """
+    uploaded.seek(0)
+    data = uploaded.read()
+    uploaded.seek(0)
+
+    if not data:
+        raise ValueError(
+            "The uploaded file is empty (0 bytes). The transfer was probably "
+            "interrupted — try uploading it again."
+        )
+
+    detected = sniff_format(data[:16])
+
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except UnidentifiedImageError:
+        if detected == "HEIC/AVIF":
+            raise ValueError(
+                f"This file is HEIC/HEIF, not a JPEG, despite being named "
+                f"'{uploaded.name}'. Phones and WhatsApp often do this.\n\n"
+                "Either install HEIC support with `pip install pillow-heif` "
+                "and add `pillow-heif` to requirements.txt, or re-save the "
+                "photo as JPEG before uploading."
+            ) from None
+        if detected.endswith("video"):
+            raise ValueError(
+                "This is a video file, not a photograph. Switch to "
+                "'Video walkthrough' in the sidebar."
+            ) from None
+        raise ValueError(
+            f"Could not decode this file. It is named '{uploaded.name}' but "
+            f"its contents look like: {detected}. The file may be corrupt or "
+            "in an unsupported format — try re-saving it as a JPEG or PNG."
+        ) from None
+    except OSError as exc:
+        raise ValueError(
+            f"The image file appears to be truncated or damaged ({exc}). "
+            "Try uploading it again."
+        ) from None
+
+    # Phone photos carry rotation in EXIF rather than in the pixel data.
+    # Without this, a portrait photo is analysed sideways.
+    try:
+        image = ImageOps.exif_transpose(image)
+    except Exception:
+        pass
+
+    return image.convert("RGB")
+
 
 def downscale(image: Image.Image, max_edge: int = MAX_IMAGE_EDGE) -> Image.Image:
     w, h = image.size
@@ -671,27 +762,36 @@ prompt = build_prompt(cat_key, config)
 
 if input_mode == "Photograph":
     uploaded = st.file_uploader(
-        "Upload site photograph", type=["jpg", "jpeg", "png", "webp"])
+        "Upload site photograph",
+        type=["jpg", "jpeg", "png", "webp", "heic", "heif", "bmp", "tiff"])
 
+    image = None
     if uploaded:
-        image = Image.open(uploaded).convert("RGB")
-        st.image(image, caption="Uploaded photograph", use_container_width=True)
+        try:
+            image = load_uploaded_image(uploaded)
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.image(image, caption="Uploaded photograph",
+                     use_container_width=True)
 
+    if image is not None:
         if st.button("Run screening", type="primary"):
             if not api_key:
                 st.error("Enter an Anthropic API key in the sidebar.")
             else:
+                raw = ""
+                assessment = None
                 with st.spinner("Analysing…"):
                     try:
                         raw = call_claude(api_key, model, image, prompt)
                         assessment = parse_assessment(raw, cat_key, config)
-                    except ValueError as exc:
+                    except (ValueError, json.JSONDecodeError) as exc:
                         st.error(f"Could not parse the model response: {exc}")
-                        st.code(raw if "raw" in dir() else "", language="text")
-                        assessment = None
+                        if raw:
+                            st.code(raw, language="text")
                     except Exception as exc:
                         st.error(f"Request failed: {exc}")
-                        assessment = None
 
                 if assessment is not None:
                     st.divider()
@@ -824,4 +924,3 @@ st.caption(
     "Work-at-Height Compliance Screening · preliminary aid only · "
     "no legal or regulatory standing under the WSH Act."
 )
-
