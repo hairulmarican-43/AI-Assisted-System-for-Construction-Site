@@ -59,6 +59,10 @@ CONFIG_PATH = Path(__file__).parent / "checks.yaml"
 # more tokens without improving accuracy.
 MAX_IMAGE_EDGE = 1568
 
+# A busy frame can carry several elements, each with a finding per check.
+# Too low a ceiling truncates the JSON mid-object.
+MAX_OUTPUT_TOKENS = 12000
+
 MODELS = {
     "Claude Sonnet 5 (recommended)": "claude-sonnet-5",
     "Claude Opus 5 (highest accuracy, higher cost)": "claude-opus-5",
@@ -158,6 +162,7 @@ class Assessment:
     summary: str
     scene_notes: str = ""
     raw: str = ""
+    truncated: bool = False
 
     @property
     def max_rpn(self) -> int:
@@ -225,6 +230,8 @@ Set bbox_confidence to "high", "medium", or "low". If you genuinely cannot local
 
 Respond with ONLY a JSON object. No markdown fences, no preamble, no commentary.
 
+Keep it compact. Each observation must be a single sentence under 30 words, and severity_rationale under 20 words — omit it entirely when you did not adjust the baseline. A busy frame may contain several elements, and an over-long response will be cut off before it is complete.
+
 {{
   "scene_notes": "one or two sentences on what the image shows, viewing angle, and anything limiting the assessment",
   "elements": [
@@ -237,7 +244,7 @@ Respond with ONLY a JSON object. No markdown fences, no preamble, no commentary.
         {{
           "check_id": "one of the ids listed above",
           "status": "compliant | non_compliant | not_visible",
-          "observation": "what you actually see, one or two sentences",
+          "observation": "what you actually see — ONE sentence, under 30 words",
           "severity": 1,
           "likelihood": 1,
           "severity_rationale": "only if you adjusted from the baseline"
@@ -354,7 +361,9 @@ def encode_image(image: Image.Image) -> str:
 # API call
 # ---------------------------------------------------------------------------
 
-def call_claude(api_key: str, model: str, image: Image.Image, prompt: str) -> str:
+def call_claude(api_key: str, model: str, image: Image.Image,
+                prompt: str) -> tuple[str, str]:
+    """Return (response_text, stop_reason)."""
     if not ANTHROPIC_AVAILABLE:
         raise RuntimeError(
             "The 'anthropic' package is not installed. Run: pip install anthropic"
@@ -365,7 +374,7 @@ def call_claude(api_key: str, model: str, image: Image.Image, prompt: str) -> st
 
     message = client.messages.create(
         model=model,
-        max_tokens=4000,
+        max_tokens=MAX_OUTPUT_TOKENS,
         messages=[{
             "role": "user",
             "content": [
@@ -381,14 +390,69 @@ def call_claude(api_key: str, model: str, image: Image.Image, prompt: str) -> st
             ],
         }],
     )
-    return "".join(
+    text = "".join(
         block.text for block in message.content if block.type == "text"
     )
+    return text, (message.stop_reason or "")
 
 
 # ---------------------------------------------------------------------------
 # Response parsing
 # ---------------------------------------------------------------------------
+
+def _repair_truncated_json(text: str) -> dict | None:
+    """
+    Recover the complete elements from a response that was cut off mid-object.
+
+    Walks the string tracking brace depth (ignoring braces inside strings) and
+    finds the last point at which an element object closed cleanly. Everything
+    after that is discarded and the structure is closed off. Better to report
+    two fully-assessed workers than to lose all three.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    s = text[start:]
+
+    depth = 0
+    in_string = False
+    escaped = False
+    last_element_end = -1
+
+    for i, ch in enumerate(s):
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+
+        if ch in "{[":
+            depth += 1
+        elif ch in "}]":
+            depth -= 1
+            # root object = 1, elements array = 2, element object = 3.
+            # Returning to depth 2 means one element just closed.
+            if depth == 2 and ch == "}":
+                last_element_end = i
+
+    if last_element_end == -1:
+        return None
+
+    candidate = s[:last_element_end + 1] + "]}"
+    try:
+        data = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+
+    data["_truncated"] = True
+    return data
+
 
 def _extract_json(text: str) -> dict:
     """Pull a JSON object out of the response, tolerating stray fences."""
@@ -405,9 +469,18 @@ def _extract_json(text: str) -> dict:
     start = cleaned.find("{")
     end = cleaned.rfind("}")
     if start != -1 and end > start:
-        return json.loads(cleaned[start:end + 1])
+        try:
+            return json.loads(cleaned[start:end + 1])
+        except json.JSONDecodeError:
+            pass
 
-    raise ValueError("No JSON object found in the model response.")
+    repaired = _repair_truncated_json(cleaned)
+    if repaired is not None:
+        return repaired
+
+    raise ValueError(
+        "The model response was not valid JSON and could not be repaired."
+    )
 
 
 def _clamp_bbox(raw) -> tuple[float, float, float, float] | None:
@@ -476,6 +549,7 @@ def parse_assessment(text: str, cat_key: str, config: dict) -> Assessment:
         summary=str(data.get("summary", "")).strip(),
         scene_notes=str(data.get("scene_notes", "")).strip(),
         raw=text,
+        truncated=bool(data.get("_truncated", False)),
     )
 
 
@@ -589,6 +663,15 @@ def extract_frames(video_path: str, interval_s: float, max_frames: int):
 def render_assessment(image: Image.Image, assessment: Assessment,
                       config: dict, key_prefix: str = ""):
     bands = config["risk_bands"]
+
+    if assessment.truncated:
+        st.warning(
+            "The model response was cut off before it finished. The elements "
+            "below were recovered, but the image may contain further elements "
+            "that were never reported. Treat this screening as incomplete and "
+            "re-run it.",
+            icon="⚠️",
+        )
 
     if assessment.elements:
         annotated, unlocated = annotate(image, assessment)
@@ -784,8 +867,11 @@ if input_mode == "Photograph":
                 assessment = None
                 with st.spinner("Analysing…"):
                     try:
-                        raw = call_claude(api_key, model, image, prompt)
+                        raw, stop_reason = call_claude(
+                            api_key, model, image, prompt)
                         assessment = parse_assessment(raw, cat_key, config)
+                        if stop_reason == "max_tokens":
+                            assessment.truncated = True
                     except (ValueError, json.JSONDecodeError) as exc:
                         st.error(f"Could not parse the model response: {exc}")
                         if raw:
@@ -849,10 +935,12 @@ else:
 
                             for i, (frame_img, ts) in enumerate(frames):
                                 try:
-                                    raw = call_claude(
+                                    raw, stop_reason = call_claude(
                                         api_key, model, frame_img, prompt)
                                     assessment = parse_assessment(
                                         raw, cat_key, config)
+                                    if stop_reason == "max_tokens":
+                                        assessment.truncated = True
                                     results.append((ts, frame_img, assessment,
                                                     None))
                                 except Exception as exc:
