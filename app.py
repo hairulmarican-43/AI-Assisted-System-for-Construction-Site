@@ -592,7 +592,7 @@ def render_assessment(image: Image.Image, assessment: Assessment,
 
     if assessment.elements:
         annotated, unlocated = annotate(image, assessment)
-        st.image(annotated, use_container_width=True,
+        st.image(annotated, width="stretch",
                  caption="Boxes are the model's own localisation. "
                          "A tilde (~) marks lower-confidence placement.")
         if unlocated:
@@ -601,7 +601,7 @@ def render_assessment(image: Image.Image, assessment: Assessment,
                 "localised in the image, so no box is drawn for them."
             )
     else:
-        st.image(image, use_container_width=True)
+        st.image(image, width="stretch")
         st.info("No relevant elements were identified in this image.")
 
     if assessment.scene_notes:
@@ -773,7 +773,7 @@ if input_mode == "Photograph":
             st.error(str(exc))
         else:
             st.image(image, caption="Uploaded photograph",
-                     use_container_width=True)
+                     width="stretch")
 
     if image is not None:
         if st.button("Run screening", type="primary"):
