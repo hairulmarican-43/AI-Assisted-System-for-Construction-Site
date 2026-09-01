@@ -1,0 +1,214 @@
+# ---------------------------------------------------------------------------
+# Inspection check definitions
+#
+# IMPORTANT — clause_ref fields are placeholders (marked TODO).
+# Fill them in from your own licensed copies of the standards. Do not paste
+# clause text into this file if the repository is public; the standards are
+# copyrighted by Enterprise Singapore. Clause *numbers* and your own paraphrase
+# are fine.
+#
+# base_severity is the WSH Risk Assessment severity axis (1-5):
+#   1 Negligible  2 Minor  3 Moderate  4 Major  5 Catastrophic
+# It represents the worst credible outcome if this check fails, and is the
+# starting point the model is told to use. The model may adjust it up or down
+# and must justify any change.
+# ---------------------------------------------------------------------------
+
+categories:
+
+  scaffold:
+    label: "Scaffold — SS 659"
+    standard: "SS 659:2020 Code of practice for scaffolds"
+    element_name: "Scaffold bay"
+    element_prefix: "SC"
+    scope: >
+      Identify each distinct scaffold bay, lift, or tower visible in the image.
+      Treat each bay between standards as one element where bays are
+      distinguishable; otherwise treat each independent structure as one element.
+    checks:
+      - id: guardrail
+        title: "Guardrails at working platform"
+        base_severity: 5
+        clause_ref: "TODO — SS 659 guardrail clause"
+        look_for: >
+          A top guardrail and an intermediate/mid rail on all open sides of any
+          platform at height. Absent, single-rail-only, or discontinuous rails
+          are non-compliant.
+      - id: toeboard
+        title: "Toe boards"
+        base_severity: 3
+        clause_ref: "TODO — SS 659 toe board clause"
+        look_for: >
+          A toe board along open edges of the working platform to prevent objects
+          falling. Note that the hazard here is falling objects, not persons.
+      - id: platform_decking
+        title: "Platform decking completeness"
+        base_severity: 5
+        clause_ref: "TODO — SS 659 platform clause"
+        look_for: >
+          Fully boarded platform with no gaps, no unsecured or overhanging boards,
+          no visible springing or damaged planks, boards resting on at least the
+          required number of supports.
+      - id: bracing_ties
+        title: "Bracing and ties to structure"
+        base_severity: 5
+        clause_ref: "TODO — SS 659 bracing / tie clause"
+        look_for: >
+          Diagonal / ledger bracing present, and ties connecting the scaffold to a
+          permanent structure at appropriate intervals. Missing ties on a tall
+          free-standing scaffold is a collapse risk.
+      - id: base_foundation
+        title: "Base plates, sole boards and footing"
+        base_severity: 4
+        clause_ref: "TODO — SS 659 foundation clause"
+        look_for: >
+          Base plates present under every standard, sole boards on soft or uneven
+          ground, standards plumb and fully seated, no packing with loose bricks
+          or timber offcuts.
+      - id: access
+        title: "Safe access"
+        base_severity: 4
+        clause_ref: "TODO — SS 659 access clause"
+        look_for: >
+          A proper internal ladder, stair tower, or access bay. Workers climbing
+          the scaffold frame itself is non-compliant.
+      - id: tagging
+        title: "Scaffold tag / status"
+        base_severity: 2
+        clause_ref: "TODO — SS 659 tagging clause"
+        look_for: >
+          A scaffold tag (green/red or equivalent) at the access point indicating
+          inspection status. Absent or expired tag.
+
+  fall_arrest_ppe:
+    label: "Fall-arrest PPE — SS 528"
+    standard: "SS 528:2006 Personal fall-arrest systems (Parts 1-6)"
+    element_name: "Worker"
+    element_prefix: "PPE"
+    scope: >
+      Identify each person visible who is working at height or near an
+      unprotected edge. One element per person. Do not assess persons clearly at
+      ground level and away from any edge.
+    checks:
+      - id: harness_worn
+        title: "Full-body harness worn"
+        base_severity: 5
+        clause_ref: "TODO — SS 528-1 full-body harness"
+        look_for: >
+          A full-body harness with shoulder and thigh straps. A waist belt or
+          positioning belt alone is not a fall-arrest harness and is
+          non-compliant for fall arrest.
+      - id: harness_fit
+        title: "Harness correctly fitted"
+        base_severity: 4
+        clause_ref: "TODO — SS 528-1 harness fitting"
+        look_for: >
+          Straps adjusted and buckled, chest strap fastened at mid-chest, no loose
+          dangling webbing, no twisted straps, dorsal D-ring sitting between the
+          shoulder blades.
+      - id: lanyard_connected
+        title: "Lanyard connected to an anchorage"
+        base_severity: 5
+        clause_ref: "TODO — SS 528-2 lanyards and energy absorbers"
+        look_for: >
+          The lanyard or SRL is actually clipped to something. A harness worn but
+          with the lanyard hooked back onto the harness itself, dangling, or
+          clipped to nothing is the single most common critical finding.
+      - id: energy_absorber
+        title: "Energy absorber present"
+        base_severity: 4
+        clause_ref: "TODO — SS 528-2 energy absorbers"
+        look_for: >
+          A shock/energy-absorbing pack on the lanyard, or a self-retracting
+          lifeline. A plain rope or webbing lanyard used for fall arrest without
+          an absorber is non-compliant.
+      - id: equipment_condition
+        title: "Visible equipment condition"
+        base_severity: 4
+        clause_ref: "TODO — SS 528 inspection requirements"
+        look_for: >
+          Cuts, fraying, abrasion, chemical staining, burns on webbing; deformed,
+          corroded or cracked hardware; a deployed energy absorber still in use.
+      - id: connector_type
+        title: "Connector type and gate"
+        base_severity: 4
+        clause_ref: "TODO — SS 528-5 connectors"
+        look_for: >
+          Self-closing and self-locking (double-action) hooks or karabiners.
+          Snap hooks with simple non-locking gates are non-compliant.
+
+  anchor_lifeline:
+    label: "Anchors & lifelines — SS 570"
+    standard: "SS 570-1 & 570-2:2022 Single-point anchor devices and flexible horizontal lifeline systems"
+    element_name: "Anchor point"
+    element_prefix: "ANC"
+    scope: >
+      Identify each anchorage point or horizontal/vertical lifeline run visible.
+      One element per anchor device or per lifeline span.
+    checks:
+      - id: anchor_suitability
+        title: "Anchorage suitability"
+        base_severity: 5
+        clause_ref: "TODO — SS 570-1 anchor device requirements"
+        look_for: >
+          A purpose-designed and installed anchor device. Improvised anchorage —
+          scaffold tubes, handrails, ductwork, pipework, rebar, ladders — is
+          non-compliant regardless of how solid it appears.
+      - id: anchor_position
+        title: "Anchor position relative to user"
+        base_severity: 5
+        clause_ref: "TODO — SS 570-1 positioning"
+        look_for: >
+          Anchor at or above the dorsal D-ring where possible. A low or
+          foot-level anchor creates a high fall factor. Also assess swing-fall
+          potential from a laterally offset anchor.
+      - id: lifeline_installation
+        title: "Horizontal lifeline installation"
+        base_severity: 5
+        clause_ref: "TODO — SS 570-2 flexible horizontal lifeline systems"
+        look_for: >
+          Proper end terminations and intermediate brackets, correct tensioning
+          device, no improvised wire rope with U-bolt clamps, no excessive sag.
+      - id: clearance
+        title: "Fall clearance below"
+        base_severity: 5
+        clause_ref: "TODO — SS 570 clearance requirements"
+        look_for: >
+          Sufficient clear distance below the user for lanyard length, absorber
+          deployment, lifeline sag and body height, plus a safety margin. Flag
+          obstructions or a low ground/slab level below the work position.
+      - id: anchor_identification
+        title: "Identification and certification marking"
+        base_severity: 2
+        clause_ref: "TODO — SS 570-1 marking requirements"
+        look_for: >
+          A legible plate or tag on the anchor device showing standard, rating,
+          installation and next inspection date.
+
+# ---------------------------------------------------------------------------
+# WSH Risk Assessment matrix (Severity x Likelihood, 5x5)
+# ---------------------------------------------------------------------------
+severity_scale:
+  1: "Negligible — no or superficial injury"
+  2: "Minor — first-aid injury, no lost time"
+  3: "Moderate — injury requiring medical treatment, lost time"
+  4: "Major — serious injury, permanent disability"
+  5: "Catastrophic — fatality or multiple fatalities"
+
+likelihood_scale:
+  1: "Rare"
+  2: "Remote"
+  3: "Occasional"
+  4: "Frequent"
+  5: "Almost certain"
+
+risk_bands:
+  - max: 3
+    label: "Low"
+    action: "Acceptable — monitor and maintain controls."
+  - max: 12
+    label: "Medium"
+    action: "Reasonably practicable measures required within a defined timeframe."
+  - max: 25
+    label: "High"
+    action: "Stop work. Immediate control measures required before work resumes."
