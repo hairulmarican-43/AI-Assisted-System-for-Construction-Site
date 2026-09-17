@@ -1,6 +1,6 @@
 """
-AI-Assisted System for Construction Site | Work-at-Height
-=========================================================
+AI-Assisted System for Construction Site | Work-at-Height Compliance Screening Tool
+===================================================================================
 Screens site photographs and video walkthroughs against SS 659 (scaffolds),
 SS 528 (personal fall-arrest systems) and SS 570 (anchor devices and horizontal
 lifeline systems) in a single pass.
