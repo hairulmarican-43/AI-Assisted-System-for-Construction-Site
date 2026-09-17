@@ -1,7 +1,7 @@
-   streamlit>=1.50
-   anthropic
-   pyyaml
-   pillow
-   pillow-heif
-   python-docx
-   opencv-python-headless
+streamlit>=1.50
+anthropic
+pyyaml
+pillow
+pillow-heif
+python-docx
+opencv-python-headless
