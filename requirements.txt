@@ -1,0 +1,10 @@
+# Streamlit 1.50+ is required: the layout uses width="stretch" and
+# st.container(key=...), which older versions do not accept.
+streamlit>=1.50
+
+anthropic                 # Claude API client (the vision assessment)
+pyyaml                    # reads checks.yaml
+pillow                    # image decoding, resizing and annotation
+pillow-heif               # lets Pillow open iPhone HEIC photos
+python-docx               # builds the Word report in report.py
+opencv-python-headless    # frame extraction for video walkthroughs
